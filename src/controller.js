@@ -1,34 +1,38 @@
 const jwt = require('jsonwebtoken')
 const MongoClient = require('mongodb').MongoClient
 const uuidv4 = require('uuid/v4')
+const Cryptr = require('cryptr')
+const ms = require('ms')
+const bcrypt = require('bcryptjs')
+const schemas = require('./schemas')
 
 module.exports = class Model {
 	constructor() {
 		this.client = null
 		this.accessTokenLifetime = 15 * 60 * 1000
 		this.refreshTokenLifetime = 3 * 24 * 60 * 60 * 1000
-		this.secretKey = 'hehehehe'
+		this.secretKey = process.env.JWT_SECRET
+		this.salt = bcrypt.genSaltSync(10)
+		this.cryptr = new Cryptr(process.env.CRYPTR_SECRET)
 
 		this.tokenAuthorizationMiddleware = this.tokenAuthorizationMiddleware.bind(this)
 		this.clientAuthorizationMiddleware = this.clientAuthorizationMiddleware.bind(this)
-		this.authentication = this.authentication.bind(this)
+		this.clientAuthorization = this.clientAuthorization.bind(this)
+		this.tokenAuthorization = this.tokenAuthorization.bind(this)
 
 		this.init()
 	}
 
 	async init() {
-		// const url = process.env.MONGO_URL || 'mongodb+srv://2I6X86RIS0A7YXP1:Sl8WP3YPp9h6GjqD@vx-cluster0-sjeib.mongodb.net/test?retryWrites=true&w=majority'
-		const url = process.env.MONGO_URL || 'mongodb://localhost:27017/retryWrites=true&w=majority'
+		const url = process.env.MONGO_URL
 		this.client = await MongoClient.connect(url, { 
 			useNewUrlParser: true,
 			useUnifiedTopology: true
 		})
 	}
 
-	async authorization(type, payload) {
-		let responseData = null
-
-		if(type === 'clientCredential') {
+	async clientAuthorization(payload) {
+		try {
 			// check if payload.clientId && payload.clientSecret match in database
 			const data = await this.client.db('auth').collection('clients').findOne({
 				clientId: payload.clientId,
@@ -36,44 +40,52 @@ module.exports = class Model {
 			})
 
 			if(!data) {
-				return {
-					status: 'error',
+				throw ({
 					message: 'invalid client credential'
-				}
+				})				
 			}
 
-			responseData = data
+			return {
+				status: 'success',
+				data: {}
+			}	
+		} catch (err) {
+			const message = err.message || 'please try again'
+			return {
+				status: 'error',
+				message: message
+			}
 		}
-		else if(type === 'accessToken') {
+	}
+
+	async tokenAuthorization(payload) {
+		try {
 			// check if jwt valid
-			if(payload.accessToken.length === 0) {
-				return {
-					status: 'error',
-					message: 'unauthorized'
-				}
+			if(!payload.accessToken || payload.accessToken.length === 0) {
+				throw ({
+					message: 'invalid authorization format'
+				})
 			}
 
 			const [head, token] = payload.accessToken.split(' ')
 			if(head !== 'Bearer') {
-				return {
-					status: 'error',
-					message: 'unauthorized'
-				}
+				throw ({
+					message: 'invalid authorization format'
+				})
 			}
 
-			try {
-				const response = await jwt.verify(token, this.secretKey)
-			} catch (err) {
-				return {
-					status: 'error',
-					message: 'unauthorized'
-				}
-			}
-		}
+			jwt.verify(token, this.secretKey)
 
-		return {
-			status: 'success',
-			data: {}
+			return {
+				status: 'success',
+				data: {}
+			}
+		} catch (err) {
+			const message = err.message || 'please try again'
+			return {
+				status: 'error',
+				message: message
+			}
 		}
 	}
 
@@ -82,7 +94,7 @@ module.exports = class Model {
 			accessToken: req.headers['authorization']
 		}
 
-		const response = await this.authorization('accessToken', payload)
+		const response = await this.tokenAuthorization(payload)
 
 		if(response.status === 'success') {
 			return next()
@@ -97,7 +109,7 @@ module.exports = class Model {
 			clientSecret: req.headers['x-client-secret']
 		}
 
-		const response = await this.authorization('clientCredential', payload)
+		const response = await this.clientAuthorization(payload)
 
 		if(response.status === 'success') {
 			return next()
@@ -107,9 +119,9 @@ module.exports = class Model {
 	}
 
 
-	async confirmAuthentication(token) {
+	async confirmAuthentication(uid) {
 		const data = await this.client.db('auth').collection('confirmations').findOne({
-			token: token
+			uid: uid
 		})
 		if(!data) {
 			return {
@@ -141,30 +153,52 @@ module.exports = class Model {
 		}
 	}
 
-	async authentication(type, payload) {
+	async authentication(payload) {
 		let userUid = null
 
-		if(type === 'refreshToken') {
+		if(payload.type === 'refreshToken') {
+			try {
+				schemas.refreshTokenAuthentication.validateSync(payload)
+			} catch (err) {
+				return {
+					status: 'error',
+					message: 'invalid parameters',
+					errors: err.errors
+				}
+			}
 			// check token in database
-			// reject if payload.refreshToken is not exist
-			// reject if token.status === expired || currentDate - token.lastActivityTs > 24h
 			const token = await this.client.db('auth').collection('tokens').findOne({
 				refreshToken: payload.refreshToken
 			})
-
 			
-			if(!token || token.status === 'inactive') {
+			// reject if token is not exist
+			if(!token) {
 				return {
 					status: 'error',
 					message: 'invalid token'
 				}
 			}
+			// reject if token is inactive
+			if(token.status === 'inactive') {
+				return {
+					status: 'error',
+					message: 'inactive token'
+				}
+			}
+			// reject if token is expired
+			if(token.status === 'expired') {
+				return {
+					status: 'error',
+					message: 'expired token'
+				}
+			}
+			// update token status if it's already expired
 			if(token.refreshTokenExpiresInTs < new Date().getTime()) {
-				const x = await this.client.db('auth').collection('tokens').findOneAndUpdate({
+				await this.client.db('auth').collection('tokens').findOneAndUpdate({
 					refreshToken: payload.refreshToken
 				}, {
 					$set: {
-						status: 'inactive'
+						status: 'expired'
 					}
 				})
 
@@ -176,20 +210,36 @@ module.exports = class Model {
 
 			userUid = token.userUid
 		}
-		else if(type === 'password') {
+		else if(payload.type === 'password') {
+			try {
+				schemas.passwordAuthentication.validateSync(payload)
+			} catch (err) {
+				return {
+					status: 'error',
+					message: 'invalid parameters',
+					errors: err.errors
+				}
+			}
 			// reject if payload.email && payload.password is not match
-			const data = await this.client.db('auth').collection('users').findOne({
-				email: payload.email,
-				password: payload.password
+			const user = await this.client.db('auth').collection('users').findOne({
+				email: payload.email
 			})
-			if(!data) {
+			if(!user) {
 				return {
 					status: 'error',
 					message: 'invalid email or password'
 				}
 			}
 
-			userUid = data.uid
+			const passwordMatch = bcrypt.compareSync(payload.password, user.password)
+			if(!passwordMatch) {
+				return {
+					status: 'error',
+					message: 'invalid email or password'
+				}
+			}
+
+			userUid = user.uid
 		}
 		else {
 			return {
@@ -200,7 +250,7 @@ module.exports = class Model {
 
 		// generate access token & refresh token
 		const refreshToken = uuidv4()
-		const accessToken = await jwt.sign({
+		const accessToken = jwt.sign({
 			userUid: userUid,
 			exp: (new Date().getTime() + this.accessTokenLifetime) / 1000
 		}, this.secretKey)
@@ -211,20 +261,20 @@ module.exports = class Model {
 			expiresInTs: new Date().getTime() + this.accessTokenLifetime,
 			refreshToken: refreshToken,
 			refreshTokenExpiresInTs: new Date().getTime() + this.refreshTokenLifetime,
-			status: 'inactive'
+			status: payload.type == 'refreshToken' ? 'active' : 'inactive'
 		})
 
 		const responseData = response.ops[0]
 
 		// only send refreshToken for type password
-		if(type === 'password') {
+		if(payload.type === 'password') {
 			delete responseData.accessToken
 			delete responseData.expiresInTs
 
 			// 2FA email
-			const confToken = uuidv4()
+			const confUid = uuidv4()
 			await this.client.db('auth').collection('confirmations').insertOne({
-				token: confToken,
+				uid: confUid,
 				type: 'CONFIRM_LOGIN',
 				payload: JSON.stringify({
 					refreshToken: refreshToken
@@ -232,12 +282,117 @@ module.exports = class Model {
 				expiresInTs: new Date().getTime() + (15 * 60 * 1000)
 			})
 
-			// send email with confToken
+			// send email with confUid
+			console.log(confUid)
 		}
 
 		return {
 			status: 'success',
 			data: responseData
+		}
+	}
+
+	async registerConfirmation(encryptedData) {
+		try {
+			// validate input
+			schemas.registerConfirmation.validateSync({
+				encryptedData: encryptedData
+			})
+
+			// decrypt and parse the payload
+			const jsonPayload = this.cryptr.decrypt(encryptedData)
+			const payload = JSON.parse(jsonPayload)
+
+			// throw error if payload expired
+			if(new Date().getTime() > payload.expiresInTs) {
+				throw ({
+					message: 'expired token'
+				})
+			}
+
+			// check if email already registered
+			const user = await this.client.db('auth').collection('users').findOne({
+				email: payload.email
+			})
+
+			// throw error if email already registered
+			if(user) {
+				throw ({
+					message: 'email already registered'
+				})
+			}
+
+			// create new user based on payload
+			await this.client.db('auth').collection('users').insertOne({
+				uid: payload.uid,
+				email: payload.email,
+				password: payload.password
+			})
+	
+			// return success
+			return {
+				status: 'success',
+				data: {}
+			}	
+		} catch (err) {			
+			const message = err.message || 'please try again'
+			return {
+				status: 'error',
+				message: message
+			}	
+		}
+	}
+
+	async register(payload) {
+		try {
+			// validate input
+			schemas.register.validateSync(payload, {
+				abortEarly: false
+			})
+
+			// check if email exist
+			const user = await this.client.db('auth').collection('users').findOne({
+				email: payload.email
+			})
+
+			// throw error if email already registered
+			if(user) {
+				return {
+					status: 'error',
+					message: 'email already registered'
+				}
+			}
+
+			// hash password
+			const hashedPassword = bcrypt.hashSync(payload.password, this.salt)
+
+			// generate uuid
+			const uid = uuidv4()
+			
+			// encrypt data
+			const encryptedData = this.cryptr.encrypt(JSON.stringify({
+				uid: uid,
+				email: payload.email,
+				password: hashedPassword,
+				expiresInTs: new Date().getTime() + ms('24h')
+			}))
+
+			// send encrypted data via email for confirmation
+			console.log(encryptedData)
+
+			// return success
+			return {
+				status: 'success',
+				data: {}
+			}	
+		} catch (err) {
+			const message = err.message || 'please try again'
+			const errors = err.errors || []
+			return {
+				status: 'error',
+				message: message,
+				errors: errors
+			}	
 		}
 	}
 }

@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const express = require('express')
 const bodyParser = require('body-parser')
 const rateLimit = require('express-rate-limit')
@@ -12,7 +14,7 @@ const ctl = new Controller()
 
 const limiter = rateLimit({
   store: new RedisStore({
-    redisURL: `redis://localhost:6379`
+    redisURL: process.env.REDIS_URL
   }),
   windowMs: 15 * 60 * 1000,
   max: 100
@@ -24,8 +26,15 @@ app.use(limiter)
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(bodyParser.json())
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'success'
+  })
+})
+
 app.post('/auth', ctl.clientAuthorizationMiddleware, async (req, res) => {
-  const response = await ctl.authentication(req.body.type, {
+  const response = await ctl.authentication({
+    type: req.body.type,
     email: req.body.email,
     password: req.body.password,
     refreshToken: req.body.refreshToken
@@ -42,6 +51,19 @@ app.post('/verify', ctl.clientAuthorizationMiddleware, ctl.tokenAuthorizationMid
   res.json({
     status: 'success'
   })
+})
+
+app.post('/register', ctl.clientAuthorizationMiddleware, async (req, res) => {
+  const response = await ctl.register({
+    email: req.body.email,
+    password: req.body.password
+  })
+  res.json(response)
+})
+
+app.post('/register/confirm/:uid', ctl.clientAuthorizationMiddleware, async (req, res) => {
+  const response = await ctl.registerConfirmation(req.params.uid)
+  res.json(response)
 })
 
 app.listen(PORT, (err) => {
