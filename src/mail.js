@@ -6,8 +6,6 @@ class Mail {
   }
 
   init() {
-    console.log(process.env.EMAIL_USER)
-    console.log(process.env.EMAIL_PASS)
     this.transporter = nodemailer.createTransport({
       host: 'smtp.zoho.com',
 			port: 465,
