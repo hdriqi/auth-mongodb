@@ -119,37 +119,86 @@ module.exports = class Model {
 	}
 
 
-	async confirmAuthentication(uid) {
-		const data = await this.client.db('auth').collection('confirmations').findOne({
-			uid: uid
-		})
-		if(!data) {
-			return {
-				status: 'error',
-				message: 'invalid token'
-			}
-		}
-		if(data.expiresInTs < new Date().getTime()) {
-			return {
-				status: 'error',
-				message: 'expired token'
-			}
-		}
-		const payload = JSON.parse(data.payload)
-
-		if(data.type === 'CONFIRM_LOGIN') {
-			await this.client.db('auth').collection('tokens').findOneAndUpdate({
-				refreshToken: payload.refreshToken
-			}, {
-				$set: {
-					status: 'active'
+	async confirmAuthentication(payload) {
+		try {
+			schemas.confirmAuthentication.validateSync(payload)	
+			if(payload.type === 'register') {
+				// decrypt and parse the payload
+				const tokenJSONpayload = this.cryptr.decrypt(payload.token)
+				const tokenPayload = JSON.parse(tokenJSONpayload)
+	
+				// throw error if payload expired
+				if(new Date().getTime() > tokenPayload.expiresInTs) {
+					throw ({
+						message: 'expired token'
+					})
 				}
-			})
-		}
-
-		return {
-			status: 'success',
-			data: {}
+	
+				// check if email already registered
+				const user = await this.client.db('auth').collection('users').findOne({
+					email: tokenPayload.email
+				})
+	
+				// throw error if email already registered
+				if(user) {
+					throw ({
+						message: 'email already registered'
+					})
+				}
+	
+				// create new user based on payload
+				await this.client.db('auth').collection('users').insertOne({
+					uid: tokenPayload.uid,
+					email: tokenPayload.email,
+					password: tokenPayload.password
+				})
+		
+				// return success
+				return {
+					status: 'success',
+					data: {}
+				}
+			}
+			if(payload.type === 'login') {
+				const data = await this.client.db('auth').collection('confirmations').findOne({
+					token: payload.token
+				})
+				if(!data) {
+					throw ({
+						message: 'invalid token'
+					})
+				}
+				if(data.expiresInTs < new Date().getTime()) {
+					throw ({
+						message: 'expired token'
+					})
+				}
+				const tokenPayload = JSON.parse(data.payload)
+		
+				if(data.type === 'CONFIRM_LOGIN' && data.status === 'inactive') {
+					await this.client.db('auth').collection('tokens').findOneAndUpdate({
+						refreshToken: tokenPayload.refreshToken
+					}, {
+						$set: {
+							status: 'active'
+						}
+					})
+				}
+		
+				return {
+					status: 'success',
+					data: {}
+				}
+			}
+		} catch (err) {
+			let message = err.message || 'please try again'
+			if(err.message === 'Invalid IV length') {
+				message = 'invalid token'
+			}
+			return {
+				status: 'error',
+				message: message
+			}	
 		}
 	}
 
@@ -272,9 +321,9 @@ module.exports = class Model {
 			delete responseData.expiresInTs
 
 			// 2FA email
-			const confUid = uuidv4()
+			const confToken = uuidv4()
 			await this.client.db('auth').collection('confirmations').insertOne({
-				uid: confUid,
+				token: confToken,
 				type: 'CONFIRM_LOGIN',
 				payload: JSON.stringify({
 					refreshToken: refreshToken
@@ -283,7 +332,7 @@ module.exports = class Model {
 			})
 
 			// send email with confUid
-			console.log(confUid)
+			console.log(confToken)
 		}
 
 		return {
@@ -292,54 +341,31 @@ module.exports = class Model {
 		}
 	}
 
-	async registerConfirmation(encryptedData) {
+	async revokeToken(payload) {
 		try {
-			// validate input
-			schemas.registerConfirmation.validateSync({
-				encryptedData: encryptedData
-			})
-
-			// decrypt and parse the payload
-			const jsonPayload = this.cryptr.decrypt(encryptedData)
-			const payload = JSON.parse(jsonPayload)
-
-			// throw error if payload expired
-			if(new Date().getTime() > payload.expiresInTs) {
-				throw ({
-					message: 'expired token'
+			schemas.revokeToken.validateSync(payload)
+			if(type === 'refreshToken') {
+				await this.client.db('auth').collection('tokens').findOneAndUpdate({
+					refreshToken: payload.token
+				}, {
+					$set: {
+						status: 'expired'
+					}
 				})
 			}
 
-			// check if email already registered
-			const user = await this.client.db('auth').collection('users').findOne({
-				email: payload.email
-			})
-
-			// throw error if email already registered
-			if(user) {
-				throw ({
-					message: 'email already registered'
-				})
-			}
-
-			// create new user based on payload
-			await this.client.db('auth').collection('users').insertOne({
-				uid: payload.uid,
-				email: payload.email,
-				password: payload.password
-			})
-	
-			// return success
 			return {
 				status: 'success',
 				data: {}
-			}	
-		} catch (err) {			
+			}
+		} catch (err) {
 			const message = err.message || 'please try again'
+			const errors = err.errors || []
 			return {
 				status: 'error',
-				message: message
-			}	
+				message: message,
+				errors: errors
+			}
 		}
 	}
 

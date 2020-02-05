@@ -43,7 +43,18 @@ app.post('/auth', ctl.clientAuthorizationMiddleware, async (req, res) => {
 })
 
 app.post('/confirm', ctl.clientAuthorizationMiddleware, async (req, res) => {
-  const response = await ctl.confirmAuthentication(req.query.token)
+  const response = await ctl.confirmAuthentication({
+    type: req.query.type,
+    token: req.query.token
+  })
+  res.json(response)
+})
+
+app.post('/revoke', ctl.clientAuthorizationMiddleware, async (req, res) => {
+  const response = await ctl.confirmAuthentication({
+    type: req.query.type,
+    token: req.query.token
+  })
   res.json(response)
 })
 
@@ -58,11 +69,6 @@ app.post('/register', ctl.clientAuthorizationMiddleware, async (req, res) => {
     email: req.body.email,
     password: req.body.password
   })
-  res.json(response)
-})
-
-app.post('/register/confirm/:uid', ctl.clientAuthorizationMiddleware, async (req, res) => {
-  const response = await ctl.registerConfirmation(req.params.uid)
   res.json(response)
 })
 
