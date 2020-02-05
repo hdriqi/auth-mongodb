@@ -177,7 +177,7 @@ module.exports = class Model {
 				}
 				const tokenPayload = JSON.parse(data.payload)
 		
-				if(data.type === 'CONFIRM_LOGIN' && data.status === 'inactive') {
+				if(data.type === 'CONFIRM_LOGIN') {
 					await this.client.db('auth').collection('tokens').findOneAndUpdate({
 						refreshToken: tokenPayload.refreshToken
 					}, {
@@ -307,6 +307,7 @@ module.exports = class Model {
 			userUid: userUid,
 			exp: (new Date().getTime() + this.accessTokenLifetime) / 1000
 		}, this.secretKey)
+		const status = payload.type === 'refreshToken' ? 'active' : 'inactive'
 
 		const response = await this.client.db('auth').collection('tokens').insertOne({
 			userUid: userUid,
@@ -314,7 +315,7 @@ module.exports = class Model {
 			expiresInTs: new Date().getTime() + this.accessTokenLifetime,
 			refreshToken: refreshToken,
 			refreshTokenExpiresInTs: new Date().getTime() + this.refreshTokenLifetime,
-			status: payload.type == 'refreshToken' ? 'active' : 'inactive',
+			status: status,
 			createdAt: new Date().toISOString()
 		})
 
