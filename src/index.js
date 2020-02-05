@@ -6,11 +6,13 @@ const rateLimit = require('express-rate-limit')
 const RedisStore = require('rate-limit-redis')
 
 const Controller = require('./controller')
+const mail = require('./mail')
 
 const PORT = process.env.PORT || 3000
 
 const app = express()
 const ctl = new Controller()
+mail.init()
 
 const limiter = rateLimit({
   store: new RedisStore({

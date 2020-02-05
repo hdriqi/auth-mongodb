@@ -5,6 +5,7 @@ const Cryptr = require('cryptr')
 const ms = require('ms')
 const bcrypt = require('bcryptjs')
 const schemas = require('./schemas')
+const mail = require('./mail')
 
 module.exports = class Model {
 	constructor() {
@@ -150,7 +151,8 @@ module.exports = class Model {
 				await this.client.db('auth').collection('users').insertOne({
 					uid: tokenPayload.uid,
 					email: tokenPayload.email,
-					password: tokenPayload.password
+					password: tokenPayload.password,
+					createdAt: new Date().toISOString()
 				})
 		
 				// return success
@@ -204,6 +206,7 @@ module.exports = class Model {
 
 	async authentication(payload) {
 		let userUid = null
+		let userEmail = null
 
 		if(payload.type === 'refreshToken') {
 			try {
@@ -289,6 +292,7 @@ module.exports = class Model {
 			}
 
 			userUid = user.uid
+			userEmail = user.email
 		}
 		else {
 			return {
@@ -310,7 +314,8 @@ module.exports = class Model {
 			expiresInTs: new Date().getTime() + this.accessTokenLifetime,
 			refreshToken: refreshToken,
 			refreshTokenExpiresInTs: new Date().getTime() + this.refreshTokenLifetime,
-			status: payload.type == 'refreshToken' ? 'active' : 'inactive'
+			status: payload.type == 'refreshToken' ? 'active' : 'inactive',
+			createdAt: new Date().toISOString()
 		})
 
 		const responseData = response.ops[0]
@@ -324,15 +329,22 @@ module.exports = class Model {
 			const confToken = uuidv4()
 			await this.client.db('auth').collection('confirmations').insertOne({
 				token: confToken,
+				userUid: userUid,
 				type: 'CONFIRM_LOGIN',
 				payload: JSON.stringify({
 					refreshToken: refreshToken
 				}),
-				expiresInTs: new Date().getTime() + (15 * 60 * 1000)
+				expiresInTs: new Date().getTime() + (15 * 60 * 1000),
+				createdAt: new Date().toISOString()
 			})
 
 			// send email with confUid
-			console.log(confToken)
+			mail.send({
+				from: `no-reply@vestrade.io`,
+				to: userEmail,
+				subject: `Login Confirmation`,
+				html: `hello here's your token ${confToken}`
+			})
 		}
 
 		return {
@@ -403,8 +415,13 @@ module.exports = class Model {
 				expiresInTs: new Date().getTime() + ms('24h')
 			}))
 
-			// send encrypted data via email for confirmation
-			console.log(encryptedData)
+			// send email with encrypted data for verification
+			mail.send({
+				from: `no-reply@vestrade.io`,
+				to: payload.email,
+				subject: `Register Verification`,
+				html: `hello here's your token ${encryptedData}`
+			})
 
 			// return success
 			return {
