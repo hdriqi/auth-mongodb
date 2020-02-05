@@ -357,7 +357,7 @@ module.exports = class Model {
 	async revokeToken(payload) {
 		try {
 			schemas.revokeToken.validateSync(payload)
-			if(type === 'refreshToken') {
+			if(payload.type === 'refreshToken') {
 				await this.client.db('auth').collection('tokens').findOneAndUpdate({
 					refreshToken: payload.token
 				}, {

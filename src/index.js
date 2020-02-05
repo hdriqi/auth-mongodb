@@ -53,7 +53,7 @@ app.post('/confirm', ctl.clientAuthorizationMiddleware, async (req, res) => {
 })
 
 app.post('/revoke', ctl.clientAuthorizationMiddleware, async (req, res) => {
-  const response = await ctl.confirmAuthentication({
+  const response = await ctl.revokeToken({
     type: req.query.type,
     token: req.query.token
   })
