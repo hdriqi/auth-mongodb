@@ -7,7 +7,7 @@ const RedisStore = require('rate-limit-redis')
 
 const Controller = require('./controller')
 
-const PORT = 3000
+const PORT = process.env.PORT || 3000
 
 const app = express()
 const ctl = new Controller()
