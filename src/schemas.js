@@ -13,6 +13,15 @@ module.exports = {
     token: yup.string().required()
   }),
 
+  requestResetPassword: yup.object().shape({
+    email: yup.string().email().required()
+  }),
+
+  confirmResetPassword: yup.object().shape({
+    token: yup.string().required(),
+    password: yup.string().required()
+  }),
+
   revokeToken: yup.object().shape({
     type: yup.string().matches(/(refreshToken)/, {
       message: 'type must be refreshToken'

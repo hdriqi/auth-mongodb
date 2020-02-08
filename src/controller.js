@@ -179,14 +179,14 @@ module.exports = class Model {
 		
 				if(data.type === 'CONFIRM_LOGIN') {
 					await this.client.db('auth').collection('tokens').findOneAndUpdate({
-						refreshToken: tokenPayload.refreshToken
+						refreshToken: tokenPayload.refreshToken,
+						status: 'inactive'
 					}, {
 						$set: {
 							status: 'active'
 						}
 					})
 				}
-		
 				return {
 					status: 'success',
 					data: {}
@@ -366,6 +366,109 @@ module.exports = class Model {
 					}
 				})
 			}
+
+			return {
+				status: 'success',
+				data: {}
+			}
+		} catch (err) {
+			const message = err.message || 'please try again'
+			const errors = err.errors || []
+			return {
+				status: 'error',
+				message: message,
+				errors: errors
+			}
+		}
+	}
+
+	async confirmResetPassword(payload) {
+		try {
+			schemas.confirmResetPassword.validateSync(payload)
+			const data = await this.client.db('auth').collection('confirmations').findOne({
+				token: payload.token
+			})
+			if(!data) {
+				throw ({
+					message: 'invalid token'
+				})
+			}
+			if(data.expiresInTs < new Date().getTime()) {
+				throw ({
+					message: 'expired token'
+				})
+			}
+
+			if(data.type === 'RESET_PASSWORD') {
+				const userUid = data.userUid
+				const hashedPassword = bcrypt.hashSync(payload.password, this.salt)
+				await this.client.db('auth').collection('users').findOneAndUpdate({
+					uid: userUid
+				}, {
+					$set: {
+						password: hashedPassword
+					}
+				})
+
+				await this.client.db('auth').collection('tokens').updateMany({
+					userUid: userUid,
+					$or: [
+						{ status: 'active'},
+						{ status: 'inactive' }
+					]
+				}, {
+					$set: {
+						status: 'expired'
+					}
+				})				
+			}
+
+			return {
+				status: 'success',
+				data: {}
+			}
+		} catch (err) {
+			const message = err.message || 'please try again'
+			const errors = err.errors || []
+			return {
+				status: 'error',
+				message: message,
+				errors: errors
+			}
+		}
+	}
+
+	async requestResetPassword(payload) {
+		try {
+			schemas.requestResetPassword.validateSync(payload)
+			// check if user exist
+			const user = await this.client.db('auth').collection('users').findOne({
+				email: payload.email
+			})
+			if(!user) {
+				throw ({
+					message: 'email not found'
+				})
+			}
+
+			// generate new token
+			const confToken = uuidv4()
+			await this.client.db('auth').collection('confirmations').insertOne({
+				token: confToken,
+				userUid: user.uid,
+				type: 'RESET_PASSWORD',
+				payload: JSON.stringify({}),
+				expiresInTs: new Date().getTime() + (15 * 60 * 1000),
+				createdAt: new Date().toISOString()
+			})
+
+			// send email with confUid
+			mail.send({
+				from: `no-reply@vestrade.io`,
+				to: payload.email,
+				subject: `Reset Password`,
+				html: `hello here's your reset password token ${confToken}`
+			})
 
 			return {
 				status: 'success',
