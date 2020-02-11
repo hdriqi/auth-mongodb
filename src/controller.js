@@ -69,7 +69,7 @@ module.exports = class Model {
 			}
 
 			const [head, token] = payload.accessToken.split(' ')
-			if(head !== 'Bearer') {
+			if(head !== 'Bearer' || token.length === 0) {
 				throw ({
 					message: 'invalid authorization format'
 				})
