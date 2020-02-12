@@ -8,7 +8,7 @@ class Worker {
 
   async init() {
     this.nc = await NATS.connect({ 
-      url: 'nats://nats-main:4222',
+      url: process.env.NATS_URL,
       json: true,
       maxReconnectAttempts: -1, 
       reconnectTimeWait: 250
