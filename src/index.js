@@ -45,8 +45,7 @@ app.post('/auth', ctl.clientAuthorizationMiddleware, async (req, res) => {
     password: req.body.password,
     refreshToken: req.body.refreshToken
   })
-  const status = response.status === 'success' ? 200 : 400
-  res.status(status).json(response)
+  res.json(response)
 })
 
 app.post('/confirm', ctl.clientAuthorizationMiddleware, async (req, res) => {
@@ -54,16 +53,14 @@ app.post('/confirm', ctl.clientAuthorizationMiddleware, async (req, res) => {
     type: req.query.type,
     token: req.query.token
   })
-  const status = response.status === 'success' ? 200 : 400
-  res.status(status).json(response)
+  res.json(response)
 })
 
 app.post('/reset/password', ctl.clientAuthorizationMiddleware, async (req, res) => {
   const response = await ctl.requestResetPassword({
     email: req.body.email
   })
-  const status = response.status === 'success' ? 200 : 400
-  res.status(status).json(response)
+  res.json(response)
 })
 
 app.post('/reset/password/confirm', ctl.clientAuthorizationMiddleware, async (req, res) => {
@@ -71,8 +68,7 @@ app.post('/reset/password/confirm', ctl.clientAuthorizationMiddleware, async (re
     token: req.query.token,
     password: req.body.password
   })
-  const status = response.status === 'success' ? 200 : 400
-  res.status(status).json(response)
+  res.json(response)
 })
 
 app.post('/revoke', ctl.clientAuthorizationMiddleware, async (req, res) => {
@@ -80,8 +76,7 @@ app.post('/revoke', ctl.clientAuthorizationMiddleware, async (req, res) => {
     type: req.query.type,
     token: req.query.token
   })
-  const status = response.status === 'success' ? 200 : 400
-  res.status(status).json(response)
+  res.json(response)
 })
 
 app.post('/verify', ctl.clientAuthorizationMiddleware, ctl.tokenAuthorizationMiddleware, async (req, res) => {
@@ -95,8 +90,7 @@ app.post('/register', ctl.clientAuthorizationMiddleware, async (req, res) => {
     email: req.body.email,
     password: req.body.password
   })
-  const status = response.status === 'success' ? 200 : 400
-  res.status(status).json(response)
+  res.json(response)
 })
 
 app.listen(PORT, (err) => {
