@@ -69,17 +69,17 @@ module.exports = class Model {
 			}
 
 			const [head, token] = payload.accessToken.split(' ')
-			if(head !== 'Bearer' || token.length === 0) {
+			if(!head || !token || (head && head !== 'Bearer') || (token && token.length === 0) ) {
 				throw ({
 					message: 'invalid authorization format'
 				})
 			}
 
-			jwt.verify(token, this.secretKey)
+			const decoded = jwt.verify(token, this.secretKey)
 
 			return {
 				status: 'success',
-				data: {}
+				data: decoded
 			}
 		} catch (err) {
 			const message = err.message || 'please try again'
@@ -305,6 +305,7 @@ module.exports = class Model {
 		const refreshToken = uuidv4()
 		const accessToken = jwt.sign({
 			userUid: userUid,
+			email: userEmail,
 			exp: (new Date().getTime() + this.accessTokenLifetime) / 1000
 		}, this.secretKey)
 		const status = payload.type === 'refreshToken' ? 'active' : 'inactive'
