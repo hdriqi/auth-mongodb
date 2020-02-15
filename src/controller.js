@@ -341,11 +341,10 @@ module.exports = class Model {
 			})
 
 			// send email with confUid
-			mail.send({
-				from: `no-reply@vestrade.io`,
-				to: userEmail,
-				subject: `Login Confirmation`,
-				html: `hello here's your token ${confToken}`
+			const link = `${process.env.FRONTEND_URL}/login/confirm?token=${confToken}`
+			mail.sendConfirmLogin({
+				email: userEmail,
+				link: link
 			})
 		}
 
@@ -464,13 +463,12 @@ module.exports = class Model {
 			})
 
 			// send email with confUid
-			mail.send({
-				from: `no-reply@vestrade.io`,
-				to: payload.email,
-				subject: `Reset Password`,
-				html: `hello here's your reset password token ${confToken}`
+			const link = `${process.env.FRONTEND_URL}/reset-password?token=${confToken}`
+			mail.sendResetPassword({
+				email: payload.email,
+				link: link
 			})
-
+			
 			return {
 				status: 'success',
 				data: {}
@@ -521,11 +519,10 @@ module.exports = class Model {
 			}))
 
 			// send email with encrypted data for verification
-			mail.send({
-				from: `no-reply@vestrade.io`,
-				to: payload.email,
-				subject: `Register Verification`,
-				html: `hello here's your token ${encryptedData}`
+			const link = `${process.env.FRONTEND_URL}/register/confirm?token=${encryptedData}`
+			mail.sendConfirmRegister({
+				email: payload.email,
+				link: link
 			})
 
 			// return success

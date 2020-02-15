@@ -1,8 +1,19 @@
 const nodemailer = require('nodemailer')
+const heml = require('heml')
+const templates = require('./mailTemplates')
+
+const hemlOpts = {
+  validate: 'soft',
+  cheerio: {},
+  juice: {},
+  beautify: {},
+  elements: []
+}
 
 class Mail {
   constructor() {
     this.transporter = null
+    this.send = this.send.bind(this)
   }
 
   init() {
@@ -28,6 +39,39 @@ class Mail {
         }
         return resolve()
       })
+    })
+  }
+
+  async sendConfirmRegister(payload) {
+    const tmpl = templates.confirmRegister(payload.link)
+    const { html } = await heml(tmpl, hemlOpts)
+    this.send({
+      from: `no-reply@vestrade.io`,
+      to: payload.email,
+      subject: `[Vestrade] Register Verification`,
+      html: html
+    })
+  }
+
+  async sendConfirmLogin(payload) {
+    const tmpl = templates.confirmLogin(payload.link)
+    const { html } = await heml(tmpl, hemlOpts)
+    this.send({
+      from: `no-reply@vestrade.io`,
+      to: payload.email,
+      subject: `[Vestrade] Login Verification`,
+      html: html
+    })
+  }
+
+  async sendResetPassword(payload) {
+    const tmpl = templates.resetPassword(payload.link)
+    const { html } = await heml(tmpl, hemlOpts)
+    this.send({
+      from: `no-reply@vestrade.io`,
+      to: payload.email,
+      subject: `[Vestrade] Reset Password`,
+      html: html
     })
   }
 }

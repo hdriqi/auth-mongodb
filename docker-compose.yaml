@@ -5,16 +5,12 @@ services:
     image: mongo
     volumes:
       - ~/data/mongodb:/data/db
-    ports:
-      - 27017:27017
     networks:
       - internal
       - local
 
   redis:
     image: redis
-    ports:
-      - 6379:6379
     networks:
       - internal
       - local
