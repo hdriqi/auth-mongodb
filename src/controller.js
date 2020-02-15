@@ -82,7 +82,13 @@ module.exports = class Model {
 				data: decoded
 			}
 		} catch (err) {
-			const message = err.message || 'please try again'
+			let message = err.message || 'please try again'
+			if(message === 'jwt expired') {
+				message = 'expired token'
+			}
+			else if(message === 'jwt malformed') {
+				message = 'invalid token'
+			}
 			return {
 				status: 'error',
 				message: message
