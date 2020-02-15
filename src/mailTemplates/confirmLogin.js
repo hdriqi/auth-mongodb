@@ -41,7 +41,7 @@ const confirmLoginEmailTemplate = (link) => {
       </row>
       <row style="margin-bottom: 8px">
         <p>Hi there,</p>
-        <p>We received a request to log in from your Vestrade account. If this is correct, please confirm by clicking the button below</p>
+        <p>We received a request to log in from your Vestrade account. If this is correct, please confirm by clicking the button below:</p>
       </row>
       <button style="margin-bottom: 36px" href="${link}">Confirm Login</button>
       <row>
