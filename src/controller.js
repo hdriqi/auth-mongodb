@@ -463,7 +463,7 @@ module.exports = class Model {
 			})
 
 			// send email with confUid
-			const link = `${process.env.FRONTEND_URL}/reset-password?token=${confToken}`
+			const link = `${process.env.FRONTEND_URL}/reset-password/confirm?token=${confToken}`
 			mail.sendResetPassword({
 				email: payload.email,
 				link: link
