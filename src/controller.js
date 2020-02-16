@@ -64,14 +64,14 @@ module.exports = class Model {
 			// check if jwt valid
 			if(!payload.accessToken || payload.accessToken.length === 0) {
 				throw ({
-					message: 'invalid authorization format'
+					message = 'invalid access token'
 				})
 			}
 
 			const [head, token] = payload.accessToken.split(' ')
 			if(!head || !token || (head && head !== 'Bearer') || (token && token.length === 0) ) {
 				throw ({
-					message: 'invalid authorization format'
+					message = 'invalid access token'
 				})
 			}
 
@@ -87,7 +87,7 @@ module.exports = class Model {
 				message = 'expired token'
 			}
 			else if(message === 'jwt malformed') {
-				message = 'invalid token'
+				message = 'invalid access token'
 			}
 			return {
 				status: 'error',
