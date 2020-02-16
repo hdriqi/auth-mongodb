@@ -64,14 +64,14 @@ module.exports = class Model {
 			// check if jwt valid
 			if(!payload.accessToken || payload.accessToken.length === 0) {
 				throw ({
-					message = 'invalid access token'
+					message: 'invalid access token'
 				})
 			}
 
 			const [head, token] = payload.accessToken.split(' ')
 			if(!head || !token || (head && head !== 'Bearer') || (token && token.length === 0) ) {
 				throw ({
-					message = 'invalid access token'
+					message: 'invalid access token'
 				})
 			}
 
@@ -84,10 +84,10 @@ module.exports = class Model {
 		} catch (err) {
 			let message = err.message || 'please try again'
 			if(message === 'jwt expired') {
-				message = 'expired token'
+				message = `expired token`
 			}
 			else if(message === 'jwt malformed') {
-				message = 'invalid access token'
+				message = `invalid access token`
 			}
 			return {
 				status: 'error',
