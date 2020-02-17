@@ -4,6 +4,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const rateLimit = require('express-rate-limit')
 const RedisStore = require('rate-limit-redis')
+const cors = require('cors')
 
 const Controller = require('./controller')
 const Worker = require('./worker')
@@ -27,6 +28,7 @@ const limiter = rateLimit({
 })
 
 //  apply to all requests
+app.use(cors())
 app.use(limiter)
 
 app.use(bodyParser.urlencoded({ extended: true }))
